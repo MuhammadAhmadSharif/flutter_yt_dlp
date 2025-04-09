@@ -53,9 +53,56 @@ def get_video_info(url):
         logger.error(f"Error fetching info for {url}: {str(e)}")
         return json.dumps({"title": "unknown_video", "thumbnail": None, "formats": []})
 
+# def download_format(url, format_id, output_path, overwrite, progress_callback):
+#     """Downloads a specific format with progress updates."""
+#     log_capture = LogCapture()
+
+#     def progress_hook(d):
+#         status = d.get("status")
+#         if status == "downloading":
+#             downloaded = int(d.get("downloaded_bytes", 0))  # Convert to int
+#             total = int(d.get("total_bytes", d.get("total_bytes_estimate", 0) or 0))  # Convert to int
+#             if total > 0:
+#                 logger.info(f"Progress for {url}: {downloaded}/{total} bytes")
+#                 progress_callback.onProgress(downloaded, total)
+#         elif status == "finished":
+#             total = int(d.get("total_bytes", d.get("total_bytes_estimate", 0) or 0))  # Convert to int
+#             logger.info(f"Download finished for {url}: {total} bytes")
+#             progress_callback.onProgress(total, total)
+#         elif status == "error":
+#             logger.error(f"Download error for {url}: {d.get('error')}")
+
+#     ydl_opts = {
+#         "format": format_id,
+#         "outtmpl": output_path,
+#         "progress_hooks": [progress_hook],
+#         "force_overwrites": overwrite,
+#         "noprogress": False,
+#         "quiet": False,  # Allow yt-dlp output for debugging
+#         "logger": logger,
+#         "verbose": True,  # Enable verbose output for debugging
+#         "logtostderr": True,  # Ensure logs go to stderr
+#         "errfile": log_capture,  # Capture errors
+#         "outfile": log_capture,  # Capture output
+#     }
+#     try:
+#         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+#             logger.info(f"Starting download: {url} format {format_id} to {output_path}")
+#             ydl.download([url])
+#             logger.info(f"Download completed for {url}")
+#     except Exception as e:
+#         logger.error(f"Download failed for {url}: {str(e)}")
+#         raise
+
+
 def download_format(url, format_id, output_path, overwrite, progress_callback):
     """Downloads a specific format with progress updates."""
     log_capture = LogCapture()
+
+    # Log the progress_callback object and its attributes
+    logger.debug(f"Progress callback received: {progress_callback}")
+    logger.debug(f"Progress callback type: {type(progress_callback)}")
+    logger.debug(f"Progress callback attributes: {dir(progress_callback) if progress_callback else 'None'}")
 
     def progress_hook(d):
         status = d.get("status")
@@ -64,11 +111,17 @@ def download_format(url, format_id, output_path, overwrite, progress_callback):
             total = int(d.get("total_bytes", d.get("total_bytes_estimate", 0) or 0))  # Convert to int
             if total > 0:
                 logger.info(f"Progress for {url}: {downloaded}/{total} bytes")
-                progress_callback.onProgress(downloaded, total)
+                try:
+                    progress_callback.onProgress(downloaded, total)
+                except AttributeError as e:
+                    logger.error(f"Failed to call onProgress: {str(e)}")
         elif status == "finished":
             total = int(d.get("total_bytes", d.get("total_bytes_estimate", 0) or 0))  # Convert to int
             logger.info(f"Download finished for {url}: {total} bytes")
-            progress_callback.onProgress(total, total)
+            try:
+                progress_callback.onProgress(total, total)
+            except AttributeError as e:
+                logger.error(f"Failed to call onProgress: {str(e)}")
         elif status == "error":
             logger.error(f"Download error for {url}: {d.get('error')}")
 
