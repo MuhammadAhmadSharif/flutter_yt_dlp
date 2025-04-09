@@ -53,9 +53,13 @@ def get_video_info(url):
         logger.error(f"Error fetching info for {url}: {str(e)}")
         return json.dumps({"title": "unknown_video", "thumbnail": None, "formats": []})
 
-def download_format(url, format_id, output_path, overwrite, progress_callback):
+def download_format(url, format_id, output_path, overwrite, progress_callback=None):
     """Downloads a specific format with progress updates."""
     log_capture = LogCapture()
+
+    # Log the callback for debugging
+    logger.debug(f"Progress callback: {progress_callback}, Type: {type(progress_callback)}")
+    logger.debug(f"Callback attributes: {dir(progress_callback) if progress_callback else 'None'}")
 
     def progress_hook(d):
         status = d.get("status")
@@ -63,20 +67,22 @@ def download_format(url, format_id, output_path, overwrite, progress_callback):
             downloaded = int(d.get("downloaded_bytes", 0))
             total = int(d.get("total_bytes", d.get("total_bytes_estimate", 0) or 0))
             if total > 0:
-                logger.info(f"Progress for {url}: {downloaded}/{total} bytes")
-                if hasattr(progress_callback, 'onProgress'):
-                    progress_callback.onProgress(downloaded, total)
-                else:
-                    logger.warning("Progress callback missing 'onProgress' method")
+                logger.info(f"Progress: {downloaded}/{total} bytes")
+                if progress_callback:
+                    try:
+                        progress_callback.onProgress(downloaded, total)
+                    except AttributeError:
+                        logger.warning("Progress callback lacks 'onProgress' method")
         elif status == "finished":
             total = int(d.get("total_bytes", d.get("total_bytes_estimate", 0) or 0))
-            logger.info(f"Download finished for {url}: {total} bytes")
-            if hasattr(progress_callback, 'onProgress'):
-                progress_callback.onProgress(total, total)
-            else:
-                logger.warning("Progress callback missing 'onProgress' method")
+            logger.info(f"Finished: {total} bytes")
+            if progress_callback:
+                try:
+                    progress_callback.onProgress(total, total)
+                except AttributeError:
+                    logger.warning("Progress callback lacks 'onProgress' method")
         elif status == "error":
-            logger.error(f"Download error for {url}: {d.get('error')}")
+            logger.error(f"Download error: {d.get('error')}")
 
     ydl_opts = {
         "format": format_id,
@@ -84,12 +90,12 @@ def download_format(url, format_id, output_path, overwrite, progress_callback):
         "progress_hooks": [progress_hook],
         "force_overwrites": overwrite,
         "noprogress": False,
-        "quiet": False,  # Allow yt-dlp output for debugging
+        "quiet": False,
         "logger": logger,
-        "verbose": True,  # Enable verbose output for debugging
-        "logtostderr": True,  # Ensure logs go to stderr
-        "errfile": log_capture,  # Capture errors
-        "outfile": log_capture,  # Capture output
+        "verbose": True,
+        "logtostderr": True,
+        "errfile": log_capture,
+        "outfile": log_capture,
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -100,9 +106,8 @@ def download_format(url, format_id, output_path, overwrite, progress_callback):
         logger.error(f"Download failed for {url}: {str(e)}")
         raise
 
-# Optional: Add a main block for testing (remove in production)
+# For testing locally
 if __name__ == "__main__":
-    # Example usage for testing
     class DummyProgressCallback:
         def onProgress(self, downloaded, total):
             print(f"Progress: {downloaded}/{total}")
@@ -112,6 +117,4 @@ if __name__ == "__main__":
     output_path = "test_video.%(ext)s"
     overwrite = True
     progress_callback = DummyProgressCallback()
-
-    print(get_video_info(url))
     download_format(url, format_id, output_path, overwrite, progress_callback)
