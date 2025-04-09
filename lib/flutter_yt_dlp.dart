@@ -57,6 +57,10 @@ def download_format(url, format_id, output_path, overwrite, progress_callback):
     """Downloads a specific format with progress updates."""
     log_capture = LogCapture()
 
+    # Log the callback object for debugging
+    logger.debug(f"Progress callback received: {progress_callback}, Type: {type(progress_callback)}")
+    logger.debug(f"Callback attributes: {dir(progress_callback)}")
+
     def progress_hook(d):
         status = d.get("status")
         if status == "downloading":
@@ -64,17 +68,17 @@ def download_format(url, format_id, output_path, overwrite, progress_callback):
             total = int(d.get("total_bytes", d.get("total_bytes_estimate", 0) or 0))
             if total > 0:
                 logger.info(f"Progress for {url}: {downloaded}/{total} bytes")
-                if hasattr(progress_callback, 'onProgress'):
+                try:
                     progress_callback.onProgress(downloaded, total)
-                else:
-                    logger.warning("Progress callback missing 'onProgress' method")
+                except AttributeError as e:
+                    logger.warning(f"Failed to call onProgress: {str(e)}")
         elif status == "finished":
             total = int(d.get("total_bytes", d.get("total_bytes_estimate", 0) or 0))
             logger.info(f"Download finished for {url}: {total} bytes")
-            if hasattr(progress_callback, 'onProgress'):
+            try:
                 progress_callback.onProgress(total, total)
-            else:
-                logger.warning("Progress callback missing 'onProgress' method")
+            except AttributeError as e:
+                logger.warning(f"Failed to call onProgress: {str(e)}")
         elif status == "error":
             logger.error(f"Download error for {url}: {d.get('error')}")
 
@@ -102,7 +106,6 @@ def download_format(url, format_id, output_path, overwrite, progress_callback):
 
 # Optional: Add a main block for testing (remove in production)
 if __name__ == "__main__":
-    # Example usage for testing
     class DummyProgressCallback:
         def onProgress(self, downloaded, total):
             print(f"Progress: {downloaded}/{total}")
